@@ -38,10 +38,11 @@ In __main__, the interaction energy arguments are entered on the command line. T
 
 from __future__ import division
 from sys import argv
+from functools import lru_cache
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from math import exp,log
+from math import exp,log,lgamma
 from scipy.special import factorial, comb, logsumexp
 from time import sleep
 import argparse
@@ -70,6 +71,17 @@ mpl.rc('font', **font)
 mpl.rcParams['xtick.direction'] = 'in'
 mpl.rcParams['ytick.direction'] = 'in'
 
+
+@lru_cache(maxsize=10000)
+def log_comb(N, j):
+    # return log(comb(N, j))
+    return lgamma(N+1) - lgamma(j+1) - lgamma(N-j+1)
+
+# for i in range(5, 200):
+#     for j in range(0,i+1):
+#         assert abs(log_comb(i,j) - log(comb(i,j))) < 1e-4
+    
+    
 class Two_layer():
     # Class to do all the calculations for the two layer model.
     def __init__(self,arg_dict):
@@ -135,38 +147,38 @@ class Two_layer():
             # Define j as number of sites on M1. By definition, M2 has less than half the sites.
             if N < (self.M1 + self.M2) / 2:
                 if N - j <= self.M2:
-                    result = log(comb(self.M1, j)) + log(comb(self.M2, N - j))                    
+                    result = log_comb(self.M1, j) + log_comb(self.M2, N - j)                    
                 else:
-                    result = log(comb(self.M1, j))                    
+                    result = log_comb(self.M1, j)                    
                     
             else:
                 if self.M1 + self.M2 - N - j <= self.M2:
-                    result = log(comb(self.M1, j)) + log(comb(self.M2, self.M1 + self.M2 - N - j))
+                    result = log_comb(self.M1, j) + log_comb(self.M2, self.M1 + self.M2 - N - j)
                 else:
-                    result = log(comb(self.M1, j))
+                    result = log_comb(self.M1, j)
 
         elif self.M1 == self.M2:
             # Easy situation when sublattices are balanced.
             if N < self.M1:
-                result = log(comb(self.M1, j)) + log(comb(self.M2, N - j))      
+                result = log_comb(self.M1, j) + log_comb(self.M2, N - j)      
             else:
-                result = log(comb(self.M1, j)) + log(comb(self.M2, self.M1 + self.M2 - N - j))
+                result = log_comb(self.M1, j) + log_comb(self.M2, self.M1 + self.M2 - N - j)
                 
         else:
             # Define j as the number of sites on M2
             if N < (self.M1 + self.M2) / 2:                            
                 if N - j <= self.M1:
-                    result = log(comb(self.M2, j)) + log(comb(self.M1, N - j))
+                    result = log_comb(self.M2, j) + log_comb(self.M1, N - j)
                 else:
-                    result = log(comb(self.M2, j))              
+                    result = log_comb(self.M2, j)              
 
             else:
                 if self.M1 + self.M2 - N - j <= self.M1:
 #                    print('N = ', N, 'j = ', j, 'part3')                                    
-                    result = log(comb(self.M2, j)) + log(comb(self.M1, self.M1 + self.M2 - N - j))                                    
-#                    result = np.log(comb(self.M2, j - self.M1))
+                    result = log_comb(self.M2, j) + log_comb(self.M1, self.M1 + self.M2 - N - j)                                    
+#                    result = np.log_comb(self.M2, j - self.M1)
                 else:
-                    result = log(comb(self.M2,j))                                 
+                    result = log_comb(self.M2,j)                                 
         return result
 
 
