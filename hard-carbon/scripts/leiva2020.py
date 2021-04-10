@@ -42,12 +42,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from math import exp,log
-from scipy.special import factorial, comb
+from scipy.special import factorial, comb, logsumexp
 from time import sleep
 import argparse
 import matplotlib as mpl
 import string
 from plotting_2l import Plotting
+from timeit import timeit
+import cProfile, pstats
 
 k_B = 1.38064852e-23 # Boltzmann const. 
 e = 1.60217662e-19 # ELectronic charge.
@@ -133,51 +135,38 @@ class Two_layer():
             # Define j as number of sites on M1. By definition, M2 has less than half the sites.
             if N < (self.M1 + self.M2) / 2:
                 if N - j <= self.M2:
-                    result = np.log(comb(self.M1, j) * comb(self.M2, N - j))                    
+                    result = log(comb(self.M1, j)) + log(comb(self.M2, N - j))                    
                 else:
-                    result = np.log(comb(self.M1, j))                    
+                    result = log(comb(self.M1, j))                    
                     
             else:
                 if self.M1 + self.M2 - N - j <= self.M2:
-                    result = np.log(comb(self.M1, j) * comb(self.M2, self.M1 + self.M2 - N - j))
+                    result = log(comb(self.M1, j)) + log(comb(self.M2, self.M1 + self.M2 - N - j))
                 else:
-                    result = np.log(comb(self.M1, j))
+                    result = log(comb(self.M1, j))
 
         elif self.M1 == self.M2:
             # Easy situation when sublattices are balanced.
             if N < self.M1:
-                result = np.log(comb(self.M1, j) * comb(self.M2, N - j))
+                result = log(comb(self.M1, j)) + log(comb(self.M2, N - j))      
             else:
-                result = np.log(comb(self.M1, j) * comb(self.M2, self.M1 + self.M2 - N - j))
+                result = log(comb(self.M1, j)) + log(comb(self.M2, self.M1 + self.M2 - N - j))
                 
         else:
             # Define j as the number of sites on M2
             if N < (self.M1 + self.M2) / 2:                            
                 if N - j <= self.M1:
-                    result = np.log(comb(self.M2, j) * comb(self.M1, N - j))
+                    result = log(comb(self.M2, j)) + log(comb(self.M1, N - j))
                 else:
-                    result = np.log(comb(self.M2, j))              
+                    result = log(comb(self.M2, j))              
 
             else:
                 if self.M1 + self.M2 - N - j <= self.M1:
 #                    print('N = ', N, 'j = ', j, 'part3')                                    
-                    result = np.log(comb(self.M2, j) * comb(self.M1, self.M1 + self.M2 - N - j))                                    
+                    result = log(comb(self.M2, j)) + log(comb(self.M1, self.M1 + self.M2 - N - j))                                    
 #                    result = np.log(comb(self.M2, j - self.M1))
                 else:
-                    result = np.log(comb(self.M2,j))              
-                    
-#            else:
-                # j is the number of vacancies in M2
-#                if self.M1 + self.M2 - N - j >= 0:
-#                    result = np.log(comb(self.M2, j) * comb(self.M1, self.M1 + self.M2 - N - j))
-#                    print('result = ', result, 'N = ', N, 'j = ', j, 'M2 vacancies = ', self.M1 + self.M2 - N - j, 'part3', self.M1, self.M2)                    
-
-#                else:
-#                    result = np.log(comb(self.M2, N - j + self.M1))
-#                    result = np.log(comb(self.M1, self.M1 + self.M2 - N - j))                    
-
-#                    result = np.log(comb(self.M2, j))
-#                    print('result = ', result, 'N = ', N, 'j = ', j, 'part4')                    
+                    result = log(comb(self.M2,j))                                 
         return result
 
 
@@ -209,9 +198,10 @@ class Two_layer():
 
         # ******Energy expressions********
 
-        self.E1 = self.E0 + self.alpha4 * np.exp(-self.beta4 * self.n1)     
+        self.E1 = self.E0 + self.alpha4 * exp(-self.beta4 * (self.n1 ** self.beta1))     
         
-        self.E2 = self.E0 - self.delE + self.alpha1 * np.exp(-self.beta1 *self.n2)   # changing the parameter lowers the votage of the majority sublattice
+        self.E2 = self.E0 - self.delE
+#        + self.alpha1 * np.exp(-self.beta1 *self.n2)   # changing the parameter lowers the votage of the majority sublattice
         g1_terms = self.g1 * (self.n1 * self.n1) # Modified to count Li-vacancy pairs.
         E01_terms = self.E1 * self.n1
         g2_terms =  self.g2 * (self.n2 * self.n2) # Modified to count Li-vacancy pairs.
@@ -258,8 +248,8 @@ class Two_layer():
 #                logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(max(0,N - self.M2),N + 1)]))                
         else:
             if self.M1 == self.M2:
-                self.logOmegas[N] = np.array([self.logOmega(j, N) for j in range(0,self.M1 + self.M2 - N + 1)])
-                self.energies[N] = np.array([self.E(j, N) for j in range(0,self.M1 + self.M2 - N + 1)])                                                               
+                self.logOmegas[N] = [self.logOmega(j, N) for j in range(0,self.M1 + self.M2 - N + 1)]
+                self.energies[N] = [self.E(j, N) for j in range(0,self.M1 + self.M2 - N + 1)]                                                               
 
 #                logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(0,self.M1 + self.M2 - N + 1)]))
             elif self.M1 < self.M2:
@@ -270,8 +260,8 @@ class Two_layer():
                 self.logOmegas[N] = np.array([self.logOmega(j, N) for j in range(max(0,self.M1 - N) ,self.M1 + self.M2 - N + 1)])
                 self.energies[N] = np.array([self.E(j, N) for j in range(max(0,self.M1 - N) ,self.M1 + self.M2 - N + 1)])                                                                
 #                logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(max(0,self.M1 - N),self.M1 + self.M2 - N + 1)]))
-        self.betatimesE[N] = self.energies[N] * self.beta
-        self.log_qs[N] = self.logSumExp(self.logOmegas[N] - self.betatimesE[N])
+        self.betatimesE[N] = np.array(self.energies[N]) * self.beta
+        self.log_qs[N] = self.logSumExp(np.array(self.logOmegas[N]) - np.array(self.betatimesE[N]))
 #            logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(self.M1 + self.M2 - N + 1)]))
         result = self.log_qs[N]
  #   print Omega(j,N)
@@ -304,9 +294,9 @@ class Two_layer():
             if self.M1 == self.M2:
                 self.subocc1s = [self.subocc1(j, N) for j in range(0,N + 1)]
             elif self.M1 < self.M2:
-                self.subocc1s = [self.subocc1(j, N) for j in range(max(0,N-self.M1), N + 1)]
+                self.subocc1s = [self.subocc1(j, N) for j in range(max(0,N - self.M1), N + 1)]
             else:
-                self.subocc1s = [self.subocc1(j, N) for j in range(max(0,self.M2), N + 1)]                
+                self.subocc1s = [self.subocc1(j, N) for j in range(max(0,N - self.M2), N + 1)]                
                 
 #            print('***************** N = ', N)
 #            print('length subocc1 =', len(self.subocc1s))
@@ -391,12 +381,14 @@ class Two_layer():
                         self.M1 -= 1
                     else:
                         self.M2 -= 1
+            self.Mtot = self.M1 + self.M2
             self.beta = 1/(k_B * self.T)                        
             self.betatimesE = [_ for _ in range(self.M1 + self.M2 + 1)]
             self.logOmegas = [_ for _ in range(self.M1 + self.M2 + 1)]
             self.energies = [_ for _ in range(self.M1 + self.M2 + 1)]
             self.log_qs = np.array([_ for _ in range(self.M1 + self.M2 + 1)],dtype=np.float64)            
             self.log_qs = np.array([self.logQ(N) for N in range(self.M1 + self.M2 + 1)],dtype=np.float64)
+            self.df['logQ'] = self.log_qs
             print(len(self.log_qs), 'length')
                 
             self.N_array = np.array([i for i in range(self.M1 + self.M2 + 1)])
@@ -408,7 +400,6 @@ class Two_layer():
             
             self.energy_diff = self.arg_dict[self.lab][self.counter]
             self.Ediff = self.energy_diff
-
             
 #            print(self.int_dict)    
             long_g1 = self.long_var('g1',self.energy_diff)
@@ -433,7 +424,7 @@ class Two_layer():
 #            self.logQ_array = np.array([self.logQ(N) for N in range(0, self.M1 + self.M2 + 1)])
 
 #    print Q_array
-            self.df['logQ'] = self.log_qs
+#            self.df['logQ'] = self.log_qs
 #            if optimisation == False:
 
             self.n1_avg = [self.subocc1_average(N) for N in range(0, self.M1 + self.M2 + 1)]
@@ -442,7 +433,7 @@ class Two_layer():
             
             self.df['op'] = (self.df['n1'] - self.df['n2'])
             self.dSvib = self.Sviba * self.df['n1'] + self.Svibb*self.df['n2']
-            self.dSvib = 0
+#            self.dSvib = 0
 
 #            plt.plot(self.df['x'],self.df['x'],label='Occupation, x', linestyle=':')            
 #            plt.plot(self.df['x'],self.df['n1'],label='n1 (inserted sites)',linestyle='dashed')
@@ -526,8 +517,8 @@ if __name__ == '__main__':
     parser.add_argument('--beta3', type=float, help='decay constant, coupled to g', default = [0.0], nargs = '+')
     parser.add_argument('--alpha1', type=float, help='amplitude of exponential decay, coupled to g', default = [0.0], nargs = '+')
     parser.add_argument('--beta1', type=float, help='decay constant, coupled to g', default = [0.0], nargs = '+')
-    parser.add_argument('--Sviba', type=float, help='Vibrational component 1', default = [0.0], nargs = '+')
-    parser.add_argument('--Svibb', type=float, help='Vibrational component 2', default = [0.0], nargs = '+')        
+    parser.add_argument('--Sviba', type=float, help='Vibrational component 1', default = [10.0], nargs = '+')
+    parser.add_argument('--Svibb', type=float, help='Vibrational component 2', default = [10.0], nargs = '+')        
     parser.add_argument('--L', type=float, help='fraction on sublattice 1', default = [0.5], nargs = '+')
     
 #    parser.add_argument('--sigma', type =float, help='quadruplet parameter from Bazant.',default=[0.0], nargs = '+')
@@ -571,15 +562,21 @@ if __name__ == '__main__':
     counter = 0
     print('arg_dict=', arg_dict.keys())
     two_layer_obj = Two_layer(arg_dict) # Instantiates claa.
+    profiler = cProfile.Profile()
+    profiler.enable()
     df_dict = two_layer_obj.solution() # gets out all the important variables and puts them in a dictionary of dataframes
-    print('df_dict=', df_dict.keys())
-    print('long_dict=',long_dict.keys())
-    plot_obj = Plotting(df_dict,long_dict)
+    profiler.disable()
+    stats = pstats.Stats(profiler).sort_stats('cumtime')
+    stats.print_stats(.07)
+    
+#    print('df_dict=', df_dict.keys())
+#    print('long_dict=',long_dict.keys())
+#    plot_obj = Plotting(df_dict,long_dict)
 #    plot_obj.int_plotter()
 #    plot_obj.plotter(args.loc)
 #    plot_obj.double_column_plot(df_dict,long_dict)
 #    sub_plotter(df_dict,long_dict,var)
-    plot_obj.column_plot() # These are just different variations on plotting scripts.
+#    plot_obj.column_plot() # These are just different variations on plotting scripts.
 #    plot_obj.plotter(0)
 #    plot_obj.twobytwo()
-    plot_obj.plotter(0)    
+#    plot_obj.plotter(0)    
