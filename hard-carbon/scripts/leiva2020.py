@@ -55,6 +55,7 @@ import cProfile, pstats
 k_B = 1.38064852e-23 # Boltzmann const. 
 e = 1.60217662e-19 # ELectronic charge.
 R = 8.3144598 # Molar gas constant in SI units
+F = 96485 # Faraday constant
 long_dict = {} # Dictionary for iterating over all the plots.
 
 # This is just stuff used in the plotting scripts. . 
@@ -77,11 +78,6 @@ def log_comb(N, j):
     # return log(comb(N, j))
     return lgamma(N+1) - lgamma(j+1) - lgamma(N-j+1)
 
-# for i in range(5, 200):
-#     for j in range(0,i+1):
-#         assert abs(log_comb(i,j) - log(comb(i,j))) < 1e-4
-    
-    
 class Two_layer():
     # Class to do all the calculations for the two layer model.
     def __init__(self,arg_dict):
@@ -111,7 +107,7 @@ class Two_layer():
         self.L = sorted(self.arg_dict['L']) # proportion on sublattice 1
         self.Sviba = sorted(self.arg_dict['Sviba']) # proportion on sublattice 1
         self.Svibb = sorted(self.arg_dict['Svibb']) # proportion on sublattice 1        
-        print('L = ',self.L)
+#        print('L = ',self.L)
         self.fact_array = np.empty((10000))
         for j in range(1000):
            if j == 0:
@@ -196,7 +192,6 @@ class Two_layer():
         else:
             # Switch to use j as occupation on M1
             if N < (self.M1 + self.M2)/2:
-
                 self.n1 = j / self.M1
                 self.n2 = (N - j) / self.M2
 
@@ -210,53 +205,52 @@ class Two_layer():
 
         # ******Energy expressions********
 
-        self.E1 = self.E0 + self.alpha4 * exp(-self.beta4 * (self.n1 ** self.beta1))     
+        self.E1 = self.E0 + self.alpha4 * exp(-self.beta4 * (self.n1**self.beta3))     
         
-        self.E2 = self.E0 - self.delE
+        self.E2 = self.E0 - self.delE + self.alpha1 * exp(-self.beta1 * self.n2)
 #        + self.alpha1 * np.exp(-self.beta1 *self.n2)   # changing the parameter lowers the votage of the majority sublattice
-        g1_terms = self.g1 * (self.n1 * self.n1) # Modified to count Li-vacancy pairs.
-        E01_terms = self.E1 * self.n1
-        g2_terms =  self.g2 * (self.n2 * self.n2) # Modified to count Li-vacancy pairs.
-        g3_terms = self.g3 * (self.n2 * self.n2 * self.n2)
-        g4_terms =  self.g4 * (self.n2 * self.n2 * self.n2 * self.n2) # Modified to count Li-vacancy pairs.
-        g5_terms =  self.g5 * (self.n1 * self.n1 * self.n1) # Modified to count Li-vacancy pairs.
-        g6_terms =  self.g6 * (self.n1 * self.n1 * self.n1 * self.n1) # Modified to count Li-vacancy pairs.                        
-        E02_terms = self.E2 * self.n2
-        result1 = (g1_terms + E01_terms + g5_terms + g6_terms) * e * self.M1
-        result2 = (g2_terms + g3_terms + g4_terms + E02_terms) * e * self.M2
-#        result2 = (g2_terms + g3_terms + g4_terms + E02_terms) * e * self.M2
-#        result3 = g3_terms * 0.5 * (e * self.M1 + e * self.M2)
-        result = result1 + result2
-        result = np.longdouble(result)            
+#        E01_terms = self.E1 * self.n1
+#        g1_terms = self.g1 * (self.n1 * self.n1) # Modified to count Li-vacancy pairs.        
+#        g5_terms =  self.g5 * (self.n1 * self.n1 * self.n1) # Modified to count Li-vacancy pairs.
+#        g6_terms =  self.g6 * (self.n1 * self.n1 * self.n1 * self.n1) # Modified to count Li-vacancy pairs.
+        n1_terms = self.n1 * (self.E1 + self.n1*(self.g1 + self.n1*(self.g5 + self.n1 * self.g6)))
+        n2_terms = self.n2 * (self.E2 + self.n2*(self.g2 + self.n2*(self.g3 + self.n2 * self.g4)))        
+
+#        E02_terms = self.E2 * self.n2        
+#        g2_terms =  self.g2 * (self.n2 * self.n2) # Modified to count Li-vacancy pairs.
+#        g3_terms = self.g3 * (self.n2 * self.n2 * self.n2)
+#        g4_terms =  self.g4 * (self.n2 * self.n2 * self.n2 * self.n2) # Modified to count Li-vacancy pairs.
+
+        result =  e * (n1_terms * self.M1 + n2_terms * self.M2)          
         return result
 
   
     def logSumExp(self,ns):
-        max = np.max(ns)
-        ds = ns - max
+        max_val = np.max(ns)
+        ds = ns - max_val
         sumOfExp = np.exp(ds).sum()
-        return max + np.log(sumOfExp)
+        return max_val + np.log(sumOfExp)
 
     def logQ(self,N):
         # Consider if further performance optimisation is possible.
         if N == 0:
-            self.logOmegas[N] = np.array([0])
-            self.energies[N] = np.array([self.E(0, 0)])                                                
+            self.logOmegas[N] = [0]
+            self.energies[N] = [self.E(0, 0)]                                               
         elif N == self.M1 + self.M2:
-            self.logOmegas[N] = np.array([0])
-            self.energies[N] = np.array([self.E(0, N)])                                                                        
+            self.logOmegas[N] = [0]
+            self.energies[N] = [self.E(0, N)]                                                                        
         elif N < (self.M1 + self.M2) / 2:
             if self.M1 == self.M2:
-                self.logOmegas[N] = np.array([self.logOmega(j, N) for j in range(0,N + 1)])
-                self.energies[N] = np.array([self.E(j, N) for j in range(0,N + 1)])                                
+                self.logOmegas[N] = [self.logOmega(j, N) for j in range(0,N + 1)]
+                self.energies[N] = [self.E(j, N) for j in range(0,N + 1)]                                
  #               logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(0,N + 1)]))
             elif self.M1 < self.M2:
-                self.logOmegas[N] = np.array([self.logOmega(j, N) for j in range(max(0,N - self.M1),N + 1)])
-                self.energies[N] = np.array([self.E(j, N) for j in range(max(0,N - self.M1),N + 1)])                
+                self.logOmegas[N] = [self.logOmega(j, N) for j in range(max(0,N - self.M1),N + 1)]
+                self.energies[N] = [self.E(j, N) for j in range(max(0,N - self.M1),N + 1)]               
 #                logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(max(0,N - self.M1),N + 1)]))
             else:
-                self.logOmegas[N] = np.array([self.logOmega(j, N) for j in range(max(0,N - self.M2),N + 1)])
-                self.energies[N] = np.array([self.E(j, N) for j in range(max(0,N - self.M2),N + 1)])                                
+                self.logOmegas[N] = [self.logOmega(j, N) for j in range(max(0,N - self.M2),N + 1)]
+                self.energies[N] = [self.E(j, N) for j in range(max(0,N - self.M2),N + 1)]                                
 #                logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(max(0,N - self.M2),N + 1)]))                
         else:
             if self.M1 == self.M2:
@@ -265,12 +259,12 @@ class Two_layer():
 
 #                logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(0,self.M1 + self.M2 - N + 1)]))
             elif self.M1 < self.M2:
-                self.logOmegas[N] = np.array([self.logOmega(j, N) for j in range(max(0,self.M2 - N) ,self.M1 + self.M2 - N + 1)])
-                self.energies[N] = np.array([self.E(j, N) for j in range(max(0,self.M2 - N) ,self.M1 + self.M2 - N + 1)])                                                
+                self.logOmegas[N] = [self.logOmega(j, N) for j in range(max(0,self.M2 - N) ,self.M1 + self.M2 - N + 1)]
+                self.energies[N] = [self.E(j, N) for j in range(max(0,self.M2 - N) ,self.M1 + self.M2 - N + 1)]                                             
  #               logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(max(0,self.M2 - N),self.M1 + self.M2 - N + 1)]))
             else:
-                self.logOmegas[N] = np.array([self.logOmega(j, N) for j in range(max(0,self.M1 - N) ,self.M1 + self.M2 - N + 1)])
-                self.energies[N] = np.array([self.E(j, N) for j in range(max(0,self.M1 - N) ,self.M1 + self.M2 - N + 1)])                                                                
+                self.logOmegas[N] = [self.logOmega(j, N) for j in range(max(0,self.M1 - N) ,self.M1 + self.M2 - N + 1)]
+                self.energies[N] = [self.E(j, N) for j in range(max(0,self.M1 - N) ,self.M1 + self.M2 - N + 1)]                                                                
 #                logq_result = self.logSumExp(np.array([(self.logOmega(j, N) - self.E(j, N) * self.beta) for j in range(max(0,self.M1 - N),self.M1 + self.M2 - N + 1)]))
         self.betatimesE[N] = np.array(self.energies[N]) * self.beta
         self.log_qs[N] = self.logSumExp(np.array(self.logOmegas[N]) - np.array(self.betatimesE[N]))
@@ -304,11 +298,11 @@ class Two_layer():
             return(result)    
         elif N < (self.M1 + self.M2) / 2:
             if self.M1 == self.M2:
-                self.subocc1s = [self.subocc1(j, N) for j in range(0,N + 1)]
+                self.subocc1s = np.array([self.subocc1(j, N) for j in range(0,N + 1)])
             elif self.M1 < self.M2:
-                self.subocc1s = [self.subocc1(j, N) for j in range(max(0,N - self.M1), N + 1)]
+                self.subocc1s = np.array([self.subocc1(j, N) for j in range(max(0,N - self.M1), N + 1)])
             else:
-                self.subocc1s = [self.subocc1(j, N) for j in range(max(0,N - self.M2), N + 1)]                
+                self.subocc1s = np.array([self.subocc1(j, N) for j in range(max(0,N - self.M2), N + 1)])                
                 
 #            print('***************** N = ', N)
 #            print('length subocc1 =', len(self.subocc1s))
@@ -372,13 +366,55 @@ class Two_layer():
         else:
             value = full_list[key][0]
             return(value)
+    def sublat_energies(self):
+        E1_list = np.empty((len(self.n1_avg)))
+        E2_list = np.empty((len(self.n1_avg)))
+        Etot_list = np.empty((len(self.n1_avg)))
+        x_arr = self.df['x'].to_numpy()
+        self.n2_avg = np.array(self.n1_avg)
+        self.n1_avg = (x_arr - (1 - self.L) * self.n2_avg) /self.L   
+        for i,n2 in enumerate(self.n2_avg):
+            x = self.df['x'].iloc[i]
+            n1 = (x - (1 - self.L) * n2) / (self.L)
+            self.E1 = self.E0 + self.alpha4 * exp(-self.beta4 * (n1**self.beta3))       
+            self.E2 = self.E0 - self.delE + self.alpha1 * exp(-self.beta1 * n2)
+            E1_list[i] = n1 * self.M1 * (self.E1 + n1*(self.g1 + n1*(self.g5 + n1 * self.g6))) / (self.M1 + self.M2)
+            E2_list[i] = n2 * self.M2 * (self.E2 + n2*(self.g2 + n2*(self.g3 + n2 * self.g4))) / (self.M1 + self.M2)
+
+#            Etot_list[i] =  E1_list[i] + E2_list[i]
+        E1_max =E1_list[-1]
+        E2_max = E2_list[-1]
+        E1_min = E1_list[0]
+        E2_min = E2_list[0]
+        print('1-x=',1-x,'x')
+        
+        E1_list_new = E1_list - x_arr * E1_max - (1-x_arr) * E1_min
+        E2_list_new = E2_list - x_arr * E2_max - (1-x_arr) * E2_min
+        Etot_list =  E1_list_new + E2_list_new        
+        plt.clf()    
+#        plt.plot(self.df['x'],np.gradient(E1_list,x_arr),label='deltaG from interlayers')
+#        plt.plot(self.df['x'],np.gradient(E2_list,x_arr),label='deltaG from pores')
+#        plt.plot(self.df['x'],np.gradient(Etot_list,x_arr),label='deltaG total')
+#        plt.plot(self.df['x'],E1_list_new - self.T * self.df[self.long_S]/F,label='H from interlayers (E_1) - TS')
+#        plt.plot(self.df['x'],E2_list_new - self.T * self.df[self.long_S]/F,label='H from pores (E_2) - TS')
+#        plt.plot(self.df['x'],Etot_list - self.T * self.df[self.long_S]/F,label='H total - TS')
+        plt.plot(self.df['x'],E1_list_new,label='H from interlayers (E_1) - TS')
+        plt.plot(self.df['x'],E2_list_new,label='H from pores (E_2) - TS')
+        plt.plot(self.df['x'],Etot_list,label='H total - TS')                
+#-self.T*self.df[self.long_dS]*np.gradient(x_arr,self.n1_avg)/F        
+#        plt.plot(self.df['x'],E1_list,label='Energy from interlayers')
+#        plt.plot(self.df['x'],E2_list,label='Energy from pores')
+#        plt.plot(self.df['x'],Etot_list,label='Total energy')        
+        plt.legend()
+        plt.xlabel('Theoretical x')
+        plt.ylabel('G (eV)')
+        plt.show()
         
     def solution(self,optimisation=False):
         # **** Excecutes and assigns all thermodynamic variables.
         # Optional argument optimisation: if set to True, allows certain features to be deactivated to speed up code.
         self.counter = 0
-        for variables in zip(*self.variable_list):
-            
+        for variables in zip(*self.variable_list):          
             self.E0,self.delE,self.g1,self.g2,self.g3,self.g4,self.g5,self.g6,self.alpha4,self.beta4,self.alpha3,self.beta3,self.alpha1,self.beta1,self.Sviba,self.Svibb,self.L,self.T = variables # Unpack the list
             self.M1 = int(self.L * self.M) # absolute number on first sublattice
             self.M2 = int((1 - self.L) * self.M)
@@ -401,12 +437,11 @@ class Two_layer():
             self.log_qs = np.array([_ for _ in range(self.M1 + self.M2 + 1)],dtype=np.float64)            
             self.log_qs = np.array([self.logQ(N) for N in range(self.M1 + self.M2 + 1)],dtype=np.float64)
             self.df['logQ'] = self.log_qs
-            print(len(self.log_qs), 'length')
+#            print(len(self.log_qs), 'length')
                 
             self.N_array = np.array([i for i in range(self.M1 + self.M2 + 1)])
             self.N_max = self.M1 + self.M2        
-            print('M1 =', self.M1, 'M2 = ',self.M2) 
-#        self.log_M1fact = self.M1*(np.log(self.M1) - 1) +np.log(np.sqrt(2*np.pi*self.M1))
+#           print('M1 =', self.M1, 'M2 = ',self.M2) 
             self.log_M1fact = self.fact_array[self.M1]
             self.log_M2fact = self.fact_array[self.M2]        
             
@@ -421,9 +456,11 @@ class Two_layer():
             self.df[long_g1] = self.g1
             self.df[long_g2] = self.g2
 #            self.df[long_E0] = np.array([self.E0 + self.alpha4 * np.exp(-self.beta4 * self.N_array[i]/self.N_max) for i in range(0, self.M1 + self.M2 + 1)])
-            long_S = self.long_var('S', self.energy_diff)
+            self.long_S = self.long_var('S', self.energy_diff)
             self.df['N'] = self.N_array
             self.df['x'] = self.N_array / self.N_max
+            self.long_x = self.long_var('x', self.energy_diff)
+#            print('len=', len(self.df['x']), 'N_max=', self.N_max)
 
             self.long_logQ = self.long_var('logQ', self.energy_diff)
             long_mu = self.long_var('mu', self.energy_diff)
@@ -444,13 +481,16 @@ class Two_layer():
             self.df['n2'] = (self.df['x'] - (1 - self.L) * self.df['n1']) / (self.L)
             
             self.df['op'] = (self.df['n1'] - self.df['n2'])
-            self.dSvib = self.Sviba * self.df['n1'] + self.Svibb*self.df['n2']
+
+#            self.dSvib = self.Sviba * self.df['n1'] + self.Svibb*self.df['n2']
+            self.dSvib = self.Sviba
 #            self.dSvib = 0
 
 #            plt.plot(self.df['x'],self.df['x'],label='Occupation, x', linestyle=':')            
-#            plt.plot(self.df['x'],self.df['n1'],label='n1 (inserted sites)',linestyle='dashed')
-#            plt.plot(self.df['x'],self.df['n2'],label='n2 (pore sites)',linestyle='dashed')
-#            plt.plot(self.df['x'],self.df['op'],label='Order parameter n1 - n2')
+
+#            plt.plot(self.df['x'],self.df['n2'],label='n1 (inserted sites)',linestyle='dashed')
+#            plt.plot(self.df['x'],self.df['n1'],label='n2 (pore sites)',linestyle='dashed')            
+#            plt.plot(self.df['x'],self.df['op'],label='Order parameter n2 - n1')
 #            plt.plot(self.df['x'],self.df['logQ'],label='logQ')
 #            plt.plot(self.df['x'],self.df['logQ1'],label='logQ1')
 #            plt.legend(fontsize=18)
@@ -467,7 +507,7 @@ class Two_layer():
             self.df[long_VkT] = - (self.df[long_mu] * e) / (k_B * self.T) # in kT!
             self.df[long_VV] = - self.df[long_mu]  # Already in V!
 
-            long_dS = self.long_var('dS',self.energy_diff)
+            self.long_dS = self.long_var('dS',self.energy_diff)
             long_dH = self.long_var('dH',self.energy_diff)
             long_d2H = self.long_var('d2H',self.energy_diff)
             long_d2S = self.long_var('d2S',self.energy_diff)            
@@ -477,14 +517,15 @@ class Two_layer():
             long_G = self.long_var('G',self.energy_diff)
 
             self.df[long_x] = self.df['x']
-            self.df[long_S] = np.array([self.S(N) for N in range(0, self.M1 + self.M2 + 1)]) # in format plotted in paper.
-            self.df[long_dS] = self.derivative(self.df,self.df['x'],self.df[long_S],long_S) + self.dSvib  # J per mole per K
-            self.df[long_d2S] = self.derivative(self.df,self.df['x'],self.df[long_dS],long_dS)  # J per mole per K            
+            self.df[self.long_S] = np.array([self.S(N) for N in range(0, self.M1 + self.M2 + 1)]) # in format plotted in paper.
+            self.df[self.long_dS] = self.derivative(self.df,self.df['x'],self.df[self.long_S],self.long_S) + self.dSvib  # J per mole per K
+            self.df[long_d2S] = self.derivative(self.df,self.df['x'],self.df[self.long_dS],self.long_dS)  # J per mole per K            
 
             self.df[long_G] = self.G()
-            self.df[long_H] = self.df[long_G] + self.T * self.df[long_S] / 1000
+            self.df[long_H] = self.df[long_G] + self.T * self.df[self.long_S] / 1000
             self.df[long_dH] = self.derivative(self.df,self.df['x'],self.df[long_H],long_H) # J per mole per K
-            self.df[long_d2H] = self.derivative(self.df,self.df['x'],self.df[long_dH],long_dH) # J per mole per K            
+            self.df[long_d2H] = self.derivative(self.df,self.df['x'],self.df[long_dH],long_dH) # J per mole per K
+#            self.sublat_energies()            
 
             if optimisation == False:
                 for var in var_list:
@@ -492,13 +533,13 @@ class Two_layer():
                 self.df.to_csv('../output_2l/all_data_'+'multi_val' + '=' + str(self.energy_diff)+ '.csv')
                 self.dataframe_dict['%.3f' % self.energy_diff] = self.df
             self.counter += 1
-            print('*********End of iteration*********\n\n')
+#            print('*********End of iteration*********\n\n')
 #        for key,df in self.dataframe_dict.iteritems():
 #            ref_df = self.dataframe_dict['400.000']
 #            self.integ_phases(ref_df,df,'dxdmu_' + key,'mu_' + key)
 #            print 'key=', key, 'limit2=', self.limit2
 #            print 'p1=', self.phase1, 'p2=', self.phase2, 'p3=', self.phase3
-        # Return the complete dataframe will all variables included.
+        # Return the complete dataframe will all variables included.    
         return(self.df)
 
 if __name__ == '__main__':
@@ -518,7 +559,8 @@ if __name__ == '__main__':
     parser.add_argument('--g6', type=float, help='Quadruplet interaction parameter of minority sublattice', default = [0], nargs='+')                
     parser.add_argument('--delE', type=float, help='Point term separation', default = [0.0], nargs='+')
     parser.add_argument('--loc', type=int, help='Legend_location', default = 0)
-    parser.add_argument('--M',type=int, help = 'removable particles in each sublattice', default = 5)
+#    parser.add_argument('--M',type=int, help = 'removable particles in each sublattice', default = 50)
+    parser.add_argument('--M',type=int, help = 'removable particles in each sublattice', default = 50)
     parser.add_argument('--T',type=float, help = 'temperature in Kelvin', default = [293.0], nargs='+')
     parser.add_argument('--nargs',type= int, help = 'number of arguments', default = 3)
     #parser.add_argument
@@ -563,32 +605,34 @@ if __name__ == '__main__':
 
     for key,value in arg_dict.items():
         if key in input_pars and key != 'M':
+#        if key in input_pars:        
             if len(value) == args.nargs:
                 var = key
 
     for key,value in arg_dict.items():
         if key != 'label' and key != 'M':
+#       if key != 'label':        
             while len(value) < args.nargs:
                 arg_dict[key].append(value[-1]) # This allows the variables that aren't changes to be specified once and then duplicated between plots/
     
     counter = 0
     print('arg_dict=', arg_dict.keys())
     two_layer_obj = Two_layer(arg_dict) # Instantiates claa.
-    profiler = cProfile.Profile()
-    profiler.enable()
+#    profiler = cProfile.Profile()
+#    profiler.enable()
     df_dict = two_layer_obj.solution() # gets out all the important variables and puts them in a dictionary of dataframes
-    profiler.disable()
-    stats = pstats.Stats(profiler).sort_stats('cumtime')
-    stats.print_stats(.07)
+#    profiler.disable()
+#    stats = pstats.Stats(profiler).sort_stats('cumtime')
+#    stats.print_stats(.15)
     
-#    print('df_dict=', df_dict.keys())
-#    print('long_dict=',long_dict.keys())
-#    plot_obj = Plotting(df_dict,long_dict)
+    print('df_dict=', df_dict.keys())
+    print('long_dict=',long_dict.keys())
+    plot_obj = Plotting(df_dict,long_dict)
 #    plot_obj.int_plotter()
 #    plot_obj.plotter(args.loc)
 #    plot_obj.double_column_plot(df_dict,long_dict)
 #    sub_plotter(df_dict,long_dict,var)
-#    plot_obj.column_plot() # These are just different variations on plotting scripts.
+    plot_obj.column_plot() # These are just different variations on plotting scripts.
 #    plot_obj.plotter(0)
 #    plot_obj.twobytwo()
-#    plot_obj.plotter(0)    
+    plot_obj.plotter(0)    
