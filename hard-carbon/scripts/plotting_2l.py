@@ -18,10 +18,10 @@ Please refer to the documentation for the leiva_2step script for more informatio
 
 # var_list = ['x','xmobile','dS','dSmob','S','V','mu','dxdmu', 'dxmobdmu', 'dH', 'H', 'dG', 'G', 'n1', 'n2'] # All the plots
 # var_names = {'x':'x','xmobile':'x$_{r}$','dS':'dS/dx','dSmob':'dS/dx$_{r}$','S':'S','V':'V','mu':r'$\mu$','dxdmu':r'dx/d$\mu$', 'dxmobdmu':r'dx$_{r}$/d$\mu$', 'dH':'dH/dx', 'H':'H', 'dG':'dG/dx', 'G':'G', 'n1':'n1', 'n2':'n2'} # Presentation of variables on plots.
-var_list = ['x','dS','S','VkT','VV','mu','dxdmu','dmudx','dH','g1','g2','E0','G','H'] # All the plots
-var_names = {'x':'x','dS':'dS/dx','S':'S','VkT':'V/kT','VV':'V/V','mu':r'$\mu$','dxdmu':r'dx/d$\mu$','dmudx':r'd$\mu$/dx','dH':'d$H$/d$x$','g1':'g1','g2':'g2','E0':'e0','G':'G','H':'H'} # Presentation of variables on plots.
+var_list = ['x','dS','S','VkT','VV','mu','dxdmu','dmudx','dH','G','H','d2H','d2S'] # All the plots
+var_names = {'x':'x','dS':'dS/dx','S':'S','VkT':'V/kT','VV':'V/V','mu':r'$\mu$','dxdmu':r'dx/d$\mu$','dmudx':r'd$\mu$/dx','dH':'d$H$/d$x$','G':'G','H':'H','d2H':'d2H','d2S':'d2S'} # Presentation of variables on plots.
 # units = {'x':'','xmobile':'','dS' : 'J mol$^{-1}$ K$^{-1}$', 'dSmob' : 'J mol$^{-1}$ K$^{-1}$', 'S' : 'J mol$^{-1}$ K$^{-1}$', 'V' : 'V vs. Li/Li$^{+}$', 'mu' : 'eV', 'dxdmu' : 'eV$^{-1}$', 'dxmobdmu' : 'eV$^{-1}$', 'dH' : 'kJ mol$^{-1}$', 'H' : 'kJ mol$^{-1}$', 'dG' : 'kJ mol$^{-1}$', 'G' : 'kJ mol$^{-1}$', 'n1' : '', 'n2' : ''} # Units for all the plots.
-units = {'x':'','dS' : '$2Mk$', 'S' : 'J mol$^{-1}$ K$^{-1}$', 'VkT' : 'kT','VV' : 'V vs. Li', 'mu' : 'eV', 'dxdmu' : 'eV$^{-1}$','dmudx':'a.u.', 'dH' : 'a.u.','g1':'kT' ,'g2':'kT','E0':'kT','G':'kJ mol$^{-1}$','H':'kJ mol$^{-1}$'} # Units for all the plots.
+units = {'x':'','dS' : 'J mol-1 K-1', 'S' : 'J mol$^{-1}$ K$^{-1}$', 'VkT' : 'kT','VV' : 'V vs. Li', 'mu' : 'eV', 'dxdmu' : 'eV$^{-1}$','dmudx':'a.u.', 'dH' : 'a.u.','G':'kJ mol$^{-1}$','H':'kJ mol$^{-1}$','d2H': 'kJ mol-1', 'd2S' : 'J mol-1 K-1'} # Units for all the plots.
 
 # plt.style.use('classic')
 mpl.rcParams['lines.linewidth'] = 2.5
@@ -257,15 +257,15 @@ class Plotting():
     def column_plot(self):
         f, ((ax1, ax2,ax3)) = plt.subplots(3,1, figsize=(4.5,9),sharex='col')
         axes = (ax1, ax2, ax3)
-        key_vals = [k.split('_')[1] for k in self.df_dict.keys() if k.startswith('g1')]
+        key_vals = [k.split('_')[1] for k in self.df_dict.keys() if not isinstance(k,int) and k.startswith('VV')]
         for k in key_vals:    
             lab = '%.3f' % (float(k))
 #        lab = '$J_{2}$ = ' +k
-            ax1.plot(self.df_dict['x'],self.df_dict['VV_' + str(lab)],label=lab,linewidth=0.75)
-            ax2.plot(self.df_dict['x'],self.df_dict['dxdmu_'+str(lab)],label=lab,linewidth=0.75)
-            ax3.plot(self.df_dict['x'],self.df_dict['dS_'+str(lab)],label=lab,linewidth=0.75)
+            ax1.plot(self.df_dict['x_' +str(lab)],self.df_dict['VV_' + str(lab)],label=lab,linewidth=0.75)
+            ax2.plot(self.df_dict['x_'+str(lab)],self.df_dict['dH_'+str(lab)],label=lab,linewidth=0.75)
+            ax3.plot(self.df_dict['x_'+str(lab)],self.df_dict['dS_'+str(lab)],label=lab,linewidth=0.75)
         ax1.set_ylabel('Voltage / V')
-        ax2.set_ylabel('d$x$/d$V$')
+        ax2.set_ylabel('d$H$/d$x$ / kJ mol-1')
         ax3.set_ylabel('d$S$/d$x$ / J mol-1 K-1')
         ax1.get_yaxis().set_label_coords(-0.1,0.5)
         ax2.get_yaxis().set_label_coords(-0.1,0.5)

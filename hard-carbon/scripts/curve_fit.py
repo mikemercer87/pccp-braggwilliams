@@ -114,7 +114,7 @@ class Curve_Fit():
         self.figures_path = '../figures/'
         self.galvan_path = '../galvanostatic/'
         self.optimisation_path = '../optimisation_output/'
-        self.experimental_dir = self.entropy_path +'HC_entropy20151020_01/'
+        self.experimental_dir = self.entropy_path +'HC_entropy20151020_00/'
 #        self.experimental_dir = self.entropy_path +'HC_entropydis_20130620_00/'
         self.datedir = strftime("%Y-%m-%d/")
         self.timestr = strftime("%Y-%m-%d_%H%M%S/")
@@ -498,6 +498,21 @@ if __name__ == '__main__':
 
 #    dqdv_interp = c_f.interpolation_dqdv(c_f.df_sim['dxdmu' + c_f.suffix])
 #    print(dqdv_interp)
+
+    curve_fit.particle_swarm(phase = 0)
+    curve_fit.simplex(phase = 1)
+    if 'g2' not in curve_fit.adjustable_list:
+        curve_fit.adjustable_list.append('g2')
+        curve_fit.adjustable_withcap.append('g2')
+        curve_fit.params_array.append(curve_fit.arg_dict['g2'][0])
+        curve_fit.var_list.append('g2')
+        curve_fit.errors.append('g2')        
+    if 'g3' not in curve_fit.adjustable_list:
+        curve_fit.adjustable_list.append('g3')
+        curve_fit.adjustable_withcap.append('g3')
+        curve_fit.params_array.append(curve_fit.arg_dict['g3'][0])
+        curve_fit.var_list.append('g3')
+        curve_fit.errors.append('g3')
     
     left_dqdv = curve_fit.left_dqdv
     right_dqdv = curve_fit.right_dqdv
@@ -515,29 +530,13 @@ if __name__ == '__main__':
 #    print('var_list =', curve_fit.var_list, 'length :', len(curve_fit.var_list))
 #    print('with_cap =', curve_fit.adjustable_withcap, 'length :', len(curve_fit.adjustable_withcap))    
     
-#    curve_fit.simplex(phase = 2)
+    curve_fit.simplex(phase = 2)
         
-#    plotting = Plotting(curve_fit)
-#    plotting.plotting_main(save=False,show=True)
-#    plotting.plotting_dQdV(save=False,show=True)    
+    plotting = Plotting(curve_fit)
+    plotting.plotting_main(save=False,show=True)
+    plotting.plotting_dQdV(save=False,show=True)    
 
 
-'''
-    curve_fit.particle_swarm(phase = 0)
-    curve_fit.simplex(phase = 1)
-    if 'g2' not in curve_fit.adjustable_list:
-        curve_fit.adjustable_list.append('g2')
-        curve_fit.adjustable_withcap.append('g2')
-        curve_fit.params_array.append(curve_fit.arg_dict['g2'][0])
-        curve_fit.var_list.append('g2')
-        curve_fit.errors.append('g2')        
-    if 'g3' not in curve_fit.adjustable_list:
-        curve_fit.adjustable_list.append('g3')
-        curve_fit.adjustable_withcap.append('g3')
-        curve_fit.params_array.append(curve_fit.arg_dict['g3'][0])
-        curve_fit.var_list.append('g3')
-        curve_fit.errors.append('g3')        
-'''
 
 
 
